@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.6;
 
-import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@chainlink/contracts/src/v0.6/VRFConsumerBase.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
 // modify contract so admins take a portion of the prize pool
 // and price to enter is either 10 dollars or 5
@@ -28,8 +28,8 @@ contract Lottery is VRFConsumerBase, Ownable {
     // 2
 
     constructor(
-        address _priceFeedAddress, 
-        address _vrfCoordinator, 
+        address _priceFeedAddress,
+        address _vrfCoordinator,
         address _link,
         uint256 _fee,
         bytes32 _keyhash
@@ -55,13 +55,13 @@ contract Lottery is VRFConsumerBase, Ownable {
         // $1, $2,000 / ETH
         // 1/2,000
         // 1 * 10000 / 2000
-        uint256 costToEnter = (usdEntryFee * 10 ** 18) / adjustedPrice;
+        uint256 costToEnter = (usdEntryFee * 10**18) / adjustedPrice;
         return costToEnter;
     }
 
     function startLottery() public onlyOwner {
         require(
-            lottery_state == LOTTERY_STATE.CLOSED, 
+            lottery_state == LOTTERY_STATE.CLOSED,
             "Can't start a new lottery yet!"
         );
         lottery_state = LOTTERY_STATE.OPEN;
@@ -73,18 +73,21 @@ contract Lottery is VRFConsumerBase, Ownable {
         emit RequestedRandomness(requestId);
     }
 
-    function fulfillRandomness(bytes32 _requestId, uint256 _randomness) internal override {
+    function fulfillRandomness(bytes32 _requestId, uint256 _randomness)
+        internal
+        override
+    {
         require(
             lottery_state == LOTTERY_STATE.CALCULATING_WINNER,
-            "You aren't there yet!" 
+            "You aren't there yet!"
         );
+        require(_randomness > 0, "random not found");
+        uint256 indexOfWinner = _randomness % players.length;
+        recentWinner = players[indexOfWinner];
+        recentWinner.transfer(address(this).balance);
+        // Reset
+        delete players;
+        lottery_state = LOTTERY_STATE.CLOSED;
+        randomness = _randomness;
     }
-    require(_randomness > 0, "random not found");
-    uint256 indexOfWinner = _randomness % players.length;
-    recentWinner = players[indexOfWinner];
-    recentWinner.transfer(address(this).balance);
-    // Reset
-    players = new address payable[](0);
-    lottery_state - LOTTERY_STATE.CLOSED;
-    randomness = _randomness;
 }
